@@ -120,7 +120,7 @@
 <body>
   <h1>弹球小游戏</h1>
   <p class="description">
-    使用键盘左右方向键控制挡板，防止小球掉落。可在下方切换难度体验不同节奏，接住掉落的道具获取增益或额外得分。
+    使用鼠标在画布内移动挡板，也可使用键盘左右方向键辅助控制。可在下方切换难度体验不同节奏，接住掉落的道具获取增益或额外得分。
   </p>
   <div id="game-container">
     <canvas id="game" width="600" height="420"></canvas>
@@ -372,6 +372,18 @@
       }
     }
 
+    function movePaddleToPointer(clientX) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const x = (clientX - rect.left) * scaleX;
+      paddle.x = x - paddle.width / 2;
+      if (paddle.x < 0) {
+        paddle.x = 0;
+      } else if (paddle.x + paddle.width > canvas.width) {
+        paddle.x = canvas.width - paddle.width;
+      }
+    }
+
     function moveBall(step) {
       ball.x += ball.dx * step;
       ball.y += ball.dy * step;
@@ -610,8 +622,28 @@
       }
     }
 
+    function handleMouseMove(event) {
+      movePaddleToPointer(event.clientX);
+      paddle.dx = 0;
+      keys.ArrowLeft = false;
+      keys.ArrowRight = false;
+    }
+
+    function handleTouchMove(event) {
+      if (event.touches.length > 0) {
+        event.preventDefault();
+        movePaddleToPointer(event.touches[0].clientX);
+        paddle.dx = 0;
+        keys.ArrowLeft = false;
+        keys.ArrowRight = false;
+      }
+    }
+
     document.addEventListener("keydown", handleKeyDown);
     document.addEventListener("keyup", handleKeyUp);
+    canvas.addEventListener("mousemove", handleMouseMove);
+    canvas.addEventListener("touchstart", handleTouchMove, { passive: false });
+    canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
     restartBtn.addEventListener("click", resetGame);
     difficultySelect.addEventListener("change", resetGame);
 
