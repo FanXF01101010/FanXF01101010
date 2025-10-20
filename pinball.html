@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>简易弹球游戏</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+      background: radial-gradient(circle at top, #1a2a6c, #2a0845);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      padding: 24px 16px 40px;
+    }
+
+    h1 {
+      margin-bottom: 16px;
+      letter-spacing: 2px;
+      text-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+    }
+
+    p.description {
+      margin-bottom: 20px;
+      text-align: center;
+      max-width: 560px;
+      line-height: 1.6;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    #game-container {
+      position: relative;
+      width: 600px;
+      max-width: 90vw;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+      overflow: hidden;
+      background: linear-gradient(160deg, rgba(0, 0, 0, 0.2), rgba(255, 255, 255, 0.05));
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    #stats {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.35);
+      font-size: 14px;
+    }
+
+    button {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      background: linear-gradient(135deg, #ff9966, #ff5e62);
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(255, 94, 98, 0.4);
+    }
+
+    button:active {
+      transform: translateY(0);
+      box-shadow: none;
+    }
+
+    @media (max-width: 480px) {
+      p.description {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>弹球小游戏</h1>
+  <p class="description">
+    使用键盘左右方向键控制挡板，防止小球掉落。点击“重新开始”立即重置。
+  </p>
+  <div id="game-container">
+    <canvas id="game" width="600" height="420"></canvas>
+    <div id="stats">
+      <span>得分：<strong id="score">0</strong></span>
+      <button id="restart">重新开始</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const scoreEl = document.getElementById("score");
+    const restartBtn = document.getElementById("restart");
+
+    const paddle = {
+      width: 110,
+      height: 16,
+      x: canvas.width / 2 - 55,
+      y: canvas.height - 40,
+      speed: 6,
+      dx: 0
+    };
+
+    const ball = {
+      x: canvas.width / 2,
+      y: canvas.height / 2,
+      radius: 10,
+      speed: 4,
+      dx: 4,
+      dy: -4
+    };
+
+    let score = 0;
+    let animationId;
+
+    const keys = {
+      ArrowLeft: false,
+      ArrowRight: false
+    };
+
+    function drawPaddle() {
+      ctx.beginPath();
+      ctx.roundRect(paddle.x, paddle.y, paddle.width, paddle.height, 8);
+      const gradient = ctx.createLinearGradient(paddle.x, paddle.y, paddle.x, paddle.y + paddle.height);
+      gradient.addColorStop(0, "#ff9966");
+      gradient.addColorStop(1, "#ff5e62");
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      ctx.closePath();
+    }
+
+    function drawBall() {
+      ctx.beginPath();
+      const gradient = ctx.createRadialGradient(ball.x, ball.y, 3, ball.x, ball.y, ball.radius);
+      gradient.addColorStop(0, "#ffffff");
+      gradient.addColorStop(1, "#50c9c3");
+      ctx.fillStyle = gradient;
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = "rgba(80, 201, 195, 0.6)";
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.closePath();
+    }
+
+    function drawBackground() {
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, "rgba(10, 25, 49, 0.9)");
+      gradient.addColorStop(1, "rgba(32, 78, 125, 0.6)");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function draw() {
+      drawBackground();
+      drawPaddle();
+      drawBall();
+    }
+
+    function update() {
+      animationId = requestAnimationFrame(update);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      draw();
+      movePaddle();
+      moveBall();
+      detectWallCollision();
+      detectPaddleCollision();
+    }
+
+    function movePaddle() {
+      paddle.x += paddle.dx;
+
+      if (paddle.x < 0) {
+        paddle.x = 0;
+      } else if (paddle.x + paddle.width > canvas.width) {
+        paddle.x = canvas.width - paddle.width;
+      }
+    }
+
+    function moveBall() {
+      ball.x += ball.dx;
+      ball.y += ball.dy;
+    }
+
+    function detectWallCollision() {
+      if (ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) {
+        ball.dx = -ball.dx;
+      }
+
+      if (ball.y - ball.radius < 0) {
+        ball.dy = -ball.dy;
+      }
+
+      if (ball.y + ball.radius > canvas.height) {
+        gameOver();
+      }
+    }
+
+    function detectPaddleCollision() {
+      const withinPaddleWidth = ball.x > paddle.x && ball.x < paddle.x + paddle.width;
+      const withinPaddleHeight = ball.y + ball.radius >= paddle.y;
+
+      if (withinPaddleWidth && withinPaddleHeight && ball.dy > 0) {
+        const collidePoint = ball.x - (paddle.x + paddle.width / 2);
+        const normalized = collidePoint / (paddle.width / 2);
+        const maxBounceAngle = Math.PI / 3; // 60°
+        const bounceAngle = normalized * maxBounceAngle;
+
+        ball.dx = ball.speed * Math.sin(bounceAngle);
+        ball.dy = -ball.speed * Math.cos(bounceAngle);
+
+        score += 1;
+        scoreEl.textContent = score;
+      }
+    }
+
+    function gameOver() {
+      cancelAnimationFrame(animationId);
+      ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 32px 'Segoe UI'";
+      ctx.textAlign = "center";
+      ctx.fillText("游戏结束", canvas.width / 2, canvas.height / 2 - 20);
+      ctx.font = "18px 'Segoe UI'";
+      ctx.fillText(`得分：${score}`, canvas.width / 2, canvas.height / 2 + 20);
+    }
+
+    function resetGame() {
+      paddle.x = canvas.width / 2 - paddle.width / 2;
+      paddle.dx = 0;
+
+      ball.x = canvas.width / 2;
+      ball.y = canvas.height / 2;
+      ball.dx = ball.speed * (Math.random() > 0.5 ? 1 : -1);
+      ball.dy = -ball.speed;
+
+      score = 0;
+      scoreEl.textContent = score;
+
+      cancelAnimationFrame(animationId);
+      update();
+    }
+
+    function handleKeyDown(e) {
+      if (e.code === "ArrowLeft") {
+        paddle.dx = -paddle.speed;
+        keys.ArrowLeft = true;
+      } else if (e.code === "ArrowRight") {
+        paddle.dx = paddle.speed;
+        keys.ArrowRight = true;
+      }
+    }
+
+    function handleKeyUp(e) {
+      if (e.code === "ArrowLeft") {
+        keys.ArrowLeft = false;
+      } else if (e.code === "ArrowRight") {
+        keys.ArrowRight = false;
+      }
+
+      if (!keys.ArrowLeft && !keys.ArrowRight) {
+        paddle.dx = 0;
+      } else if (keys.ArrowLeft) {
+        paddle.dx = -paddle.speed;
+      } else if (keys.ArrowRight) {
+        paddle.dx = paddle.speed;
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("keyup", handleKeyUp);
+    restartBtn.addEventListener("click", resetGame);
+
+    // 启动游戏
+    update();
+  </script>
+</body>
+</html>
